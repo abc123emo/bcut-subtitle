@@ -23,20 +23,28 @@ jobs:
       - name: Install PyInstaller
         run: python -m pip install --upgrade pyinstaller
 
-      - name: Build exe
-        run: python -m PyInstaller --clean --noconfirm --onefile --name bcut_subtitle bcut_subtitle.py
+      - name: Build GUI exe (无控制台)
+        run: python -m PyInstaller --clean --noconfirm --onefile --windowed --name bcut_subtitle bcut_subtitle.py
 
-      - name: Upload artifact
+      - name: Build CLI exe (带控制台)
+        run: python -m PyInstaller --clean --noconfirm --onefile --name bcut_subtitle_cli bcut_subtitle.py
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: bcut_subtitle-windows
-          path: dist/bcut_subtitle.exe
+          path: |
+            dist/bcut_subtitle.exe
+            dist/bcut_subtitle_cli.exe
           if-no-files-found: error
 
       - name: Publish release (latest)
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: latest
-          name: bcut_subtitle（最新版）
-          files: dist/bcut_subtitle.exe
-          make_latest: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create latest dist/bcut_subtitle.exe dist/bcut_subtitle_cli.exe \
+            --title "bcut_subtitle（最新版）" \
+            --latest \
+            --notes "Windows 单文件版。bcut_subtitle.exe = 图形界面（双击用）；bcut_subtitle_cli.exe = 命令行。视频输入需把 ffmpeg.exe 与 exe 放同目录。"

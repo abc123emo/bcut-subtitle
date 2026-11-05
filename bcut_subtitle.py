@@ -238,8 +238,14 @@ def to_lrc(utterances):
     return "\n".join(out)
 
 
+_LOG_QUEUE = None  # GUI 模式下设为 queue.Queue，跨线程把日志回传到界面
+
+
 def log(msg):
-    print(msg, flush=True)
+    if _LOG_QUEUE is not None:
+        _LOG_QUEUE.put(("log", str(msg)))
+    else:
+        print(msg, flush=True)
 
 
 def convert_one(inpath, outdir, fmt, interval):
@@ -314,38 +320,8 @@ def _pause():
         pass
 
 
-def main():
-    ap = argparse.ArgumentParser(
-        description="必剪(bcut) 自动字幕工具（复刻萤火虫核心功能，免费、无需登录）"
-    )
-    ap.add_argument("inputs", nargs="*", help="输入媒体文件（可多个；留空进入交互模式）")
-    ap.add_argument("-f", "--format", default="srt", choices=sorted(OUTPUT_EXTS),
-                    help="输出格式（默认 srt）")
-    ap.add_argument("-o", "--outdir", default=None, help="输出目录（默认与输入同目录）")
-    ap.add_argument("-i", "--interval", type=float, default=2.0, help="轮询间隔/秒（默认 2）")
-    ap.add_argument("--pause", action="store_true", help="结束后暂停（双击 exe 时建议加）")
-    args = ap.parse_args()
-
-    # 双击 exe 无参数 → 进入交互模式
-    interactive = not args.inputs
-    if interactive:
-        print(_banner())
-        inputs = []
-        print("逐个输入媒体文件路径（也可把文件拖进本窗口后回车），空行结束：")
-        while True:
-            try:
-                line = input("> ").strip().strip('"')
-            except (EOFError, KeyboardInterrupt):
-                break
-            if not line:
-                break
-            inputs.append(line)
-        args.inputs = inputs
-        if not args.inputs:
-            print("未输入任何文件。")
-            _pause()
-            return
-
+def run_cli(args):
+    """命令行/批量模式：逐个处理输入文件。"""
     for inpath in args.inputs:
         if not os.path.isfile(inpath):
             log(f"跳过，文件不存在: {inpath}")
@@ -362,7 +338,210 @@ def main():
             print("\n已中断", file=sys.stderr)
             sys.exit(130)
 
-    if interactive or args.pause:
+
+def interactive_mode():
+    """无图形界面时退化的文本交互模式，返回输入的文件列表。"""
+    print(_banner())
+    inputs = []
+    print("逐个输入媒体文件路径（也可把文件拖进本窗口后回车），空行结束：")
+    while True:
+        try:
+            line = input("> ").strip().strip('"')
+        except (EOFError, KeyboardInterrupt):
+            break
+        if not line:
+            break
+        inputs.append(line)
+    return inputs
+
+
+def run_gui(initial_files=None):
+    """Tkinter 图形界面（懒加载 tkinter；无 tkinter/无显示时抛出异常由调用方回退）。"""
+    import tkinter as tk
+    from tkinter import ttk, filedialog
+    import queue
+    import threading
+
+    global _LOG_QUEUE
+    _LOG_QUEUE = queue.Queue()
+
+    files = [f for f in (initial_files or []) if os.path.isfile(f)]
+
+    root = tk.Tk()
+    root.title("必剪自动字幕工具")
+    root.geometry("700x520")
+    root.minsize(560, 400)
+
+    # ---- 文件列表 ----
+    top = ttk.Frame(root, padding=(10, 10, 10, 4))
+    top.pack(fill="x")
+    ttk.Button(top, text="添加文件…", command=lambda: add_files()).pack(side="left")
+    ttk.Button(top, text="移除选中", command=lambda: remove_selected()).pack(side="left", padx=(6, 0))
+    ttk.Button(top, text="清空", command=lambda: clear_files()).pack(side="left", padx=(6, 0))
+
+    mid = ttk.Frame(root, padding=(10, 0, 10, 4))
+    mid.pack(fill="both", expand=True)
+    listbox = tk.Listbox(mid, selectmode="extended", activestyle="dotbox")
+    sb = ttk.Scrollbar(mid, orient="vertical", command=listbox.yview)
+    listbox.config(yscrollcommand=sb.set)
+    listbox.pack(side="left", fill="both", expand=True)
+    sb.pack(side="right", fill="y")
+
+    # ---- 设置行 ----
+    setf = ttk.Frame(root, padding=(10, 0, 10, 4))
+    setf.pack(fill="x")
+    ttk.Label(setf, text="输出格式:").pack(side="left")
+    fmt_var = tk.StringVar(value="srt")
+    ttk.Combobox(setf, textvariable=fmt_var, values=sorted(OUTPUT_EXTS),
+                 state="readonly", width=6).pack(side="left", padx=(4, 12))
+    ttk.Label(setf, text="输出目录(留空=同目录):").pack(side="left")
+    outdir_var = tk.StringVar(value="")
+    ttk.Entry(setf, textvariable=outdir_var).pack(side="left", fill="x", expand=True, padx=(4, 4))
+    ttk.Button(setf, text="浏览…", command=lambda: browse_outdir()).pack(side="left")
+
+    # ---- 操作 + 状态 ----
+    actf = ttk.Frame(root, padding=(10, 0, 10, 4))
+    actf.pack(fill="x")
+    start_btn = ttk.Button(actf, text="开始识别", command=lambda: start())
+    start_btn.pack(side="left")
+    status_var = tk.StringVar(value="就绪")
+    ttk.Label(actf, textvariable=status_var).pack(side="left", padx=(10, 0))
+
+    # ---- 日志区 ----
+    logf = ttk.Frame(root, padding=(10, 0, 10, 10))
+    logf.pack(fill="both", expand=True)
+    log_text = tk.Text(logf, height=10, state="disabled", wrap="word")
+    lsb = ttk.Scrollbar(logf, orient="vertical", command=log_text.yview)
+    log_text.config(yscrollcommand=lsb.set)
+    log_text.pack(side="left", fill="both", expand=True)
+    lsb.pack(side="right", fill="y")
+
+    def append_log(line):
+        log_text.config(state="normal")
+        log_text.insert("end", line + "\n")
+        log_text.see("end")
+        log_text.config(state="disabled")
+
+    def refresh_list():
+        listbox.delete(0, "end")
+        for f in files:
+            listbox.insert("end", f)
+
+    def add_files():
+        picked = filedialog.askopenfilenames(
+            title="选择媒体文件",
+            filetypes=[("媒体文件", "*.mp3 *.wav *.m4a *.flac *.aac *.mp4 *.mkv *.avi *.flv *.mov *.webm"),
+                       ("音频", "*.mp3 *.wav *.m4a *.flac *.aac"),
+                       ("视频", "*.mp4 *.mkv *.avi *.flv *.mov *.webm"),
+                       ("所有文件", "*.*")],
+        )
+        for p in picked:
+            if p not in files:
+                files.append(p)
+        refresh_list()
+
+    def remove_selected():
+        for idx in reversed(listbox.curselection()):
+            del files[idx]
+        refresh_list()
+
+    def clear_files():
+        files.clear()
+        refresh_list()
+
+    def browse_outdir():
+        d = filedialog.askdirectory(title="选择输出目录")
+        if d:
+            outdir_var.set(d)
+
+    def start():
+        if not files:
+            status_var.set("请先添加文件")
+            return
+        start_btn.config(state="disabled")
+        status_var.set("识别中…")
+        threading.Thread(target=worker, args=(list(files), fmt_var.get(),
+                                              outdir_var.get().strip() or None), daemon=True).start()
+
+    def worker(file_list, fmt, outdir):
+        interval = 2.0
+        for f in file_list:
+            d = outdir or os.path.dirname(os.path.abspath(f)) or "."
+            try:
+                os.makedirs(d, exist_ok=True)
+                convert_one(f, d, fmt, interval)
+            except Exception as e:
+                log(f"[错误] {f}: {e}")
+        _LOG_QUEUE.put(("done", None))
+
+    def poll_log():
+        try:
+            while True:
+                kind, payload = _LOG_QUEUE.get_nowait()
+                if kind == "log":
+                    append_log(payload)
+                elif kind == "done":
+                    start_btn.config(state="normal")
+                    status_var.set("完成")
+        except queue.Empty:
+            pass
+        root.after(100, poll_log)
+
+    refresh_list()
+    append_log("提示: 音频(mp3/wav/m4a/flac/aac)直接识别；视频需同目录放 ffmpeg.exe。")
+    poll_log()
+    root.mainloop()
+
+
+def main():
+    ap = argparse.ArgumentParser(
+        description="必剪(bcut) 自动字幕工具（复刻萤火虫核心功能，免费、无需登录）"
+    )
+    ap.add_argument("inputs", nargs="*", help="输入媒体文件（可多个）")
+    ap.add_argument("-f", "--format", default="srt", choices=sorted(OUTPUT_EXTS),
+                    help="输出格式（默认 srt）")
+    ap.add_argument("-o", "--outdir", default=None, help="输出目录（默认与输入同目录）")
+    ap.add_argument("-i", "--interval", type=float, default=2.0, help="轮询间隔/秒（默认 2）")
+    ap.add_argument("--cli", action="store_true", help="强制命令行模式（不启动 GUI）")
+    ap.add_argument("--gui", action="store_true", help="启动图形界面")
+    ap.add_argument("--pause", action="store_true", help="命令行结束后暂停")
+    args = ap.parse_args()
+
+    # 打包成 --windowed（无控制台）时，sys.stdout 为 None → 始终走 GUI
+    gui_app = getattr(sys, "frozen", False) and sys.stdout is None
+
+    if gui_app:
+        run_gui([a for a in sys.argv[1:] if os.path.isfile(a)])
+        return
+    if args.gui:
+        run_gui(args.inputs or None)
+        return
+    if args.cli:
+        if not args.inputs:
+            print("--cli 需要至少一个输入文件", file=sys.stderr)
+            return
+        run_cli(args)
+        if args.pause:
+            _pause()
+        return
+    if args.inputs:
+        run_cli(args)
+        if args.pause:
+            _pause()
+        return
+
+    # 无参数：优先 GUI，失败则回退文本交互
+    try:
+        run_gui()
+    except Exception as e:
+        print(str(e))
+        inputs = interactive_mode()
+        if not inputs:
+            print("未输入任何文件。")
+            _pause()
+            return
+        args.inputs = inputs
+        run_cli(args)
         _pause()
 
 

@@ -7,7 +7,7 @@ echo   bcut_subtitle - Windows exe 打包脚本
 echo ============================================
 echo.
 
-echo [1/3] 检查 Python...
+echo [1/4] 检查 Python...
 python --version >nul 2>&1
 if errorlevel 1 (
     echo [错误] 未找到 Python，请先安装 Python 3.8+ 并勾选 "Add python.exe to PATH"
@@ -18,7 +18,7 @@ if errorlevel 1 (
 python --version
 
 echo.
-echo [2/3] 安装 PyInstaller...
+echo [2/4] 安装 PyInstaller...
 python -m pip install --upgrade pyinstaller
 if errorlevel 1 (
     echo [错误] PyInstaller 安装失败，请检查网络
@@ -27,11 +27,20 @@ if errorlevel 1 (
 )
 
 echo.
-echo [3/3] 打包中（生成单文件 exe）...
+echo [3/4] 打包 GUI 版（无控制台，双击用）...
 rem 如需自定义图标，在下面一行加: --icon app.ico
-python -m PyInstaller --clean --noconfirm --onefile --name bcut_subtitle bcut_subtitle.py
+python -m PyInstaller --clean --noconfirm --onefile --windowed --name bcut_subtitle bcut_subtitle.py
 if errorlevel 1 (
-    echo [错误] 打包失败
+    echo [错误] GUI 版打包失败
+    pause
+    exit /b 1
+)
+
+echo.
+echo [4/4] 打包 CLI 版（带控制台，命令行用）...
+python -m PyInstaller --clean --noconfirm --onefile --name bcut_subtitle_cli bcut_subtitle.py
+if errorlevel 1 (
+    echo [错误] CLI 版打包失败
     pause
     exit /b 1
 )
@@ -39,7 +48,8 @@ if errorlevel 1 (
 echo.
 echo ============================================
 echo   打包完成！
-echo   exe 文件: dist\bcut_subtitle.exe
+echo   GUI 版: dist\bcut_subtitle.exe   （双击打开图形界面）
+echo   CLI 版: dist\bcut_subtitle_cli.exe（命令行/拖拽批量）
 echo.
 echo   提示: 如需识别"视频"文件，请把 ffmpeg.exe
 echo         放到 dist\ 目录下（与 exe 同级）。

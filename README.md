@@ -6,36 +6,46 @@
 ## 快速开始
 
 ```bash
-# 音频直接识别
-python3 bcut_subtitle.py 录音.mp3
+# 无参数启动图形界面（GUI）
+python3 bcut_subtitle.py
+
+# 音频直接识别（命令行）
+python3 bcut_subtitle.py --cli 录音.mp3
 
 # 视频自动提取伴音（需要系统安装 ffmpeg）
-python3 bcut_subtitle.py 视频.mp4
+python3 bcut_subtitle.py --cli 视频.mp4
 
 # 指定格式 / 批量 / 输出目录
-python3 bcut_subtitle.py a.mp4 b.mp3 -f json -o out/
+python3 bcut_subtitle.py --cli a.mp4 b.mp3 -f json -o out/
 ```
 
 输出格式：`srt`（默认，字幕）、`json`（原始结果）、`txt`（纯文本）、`lrc`（歌词）。
+
+**图形界面（GUI）**：双击 exe 或运行 `python3 bcut_subtitle.py` 打开，可「添加文件 → 选格式 → 开始识别」，进度实时显示在窗口里。
 
 ## 打包成 Windows exe
 
 > 注意：PyInstaller **不支持跨平台编译**，必须在 Windows 上执行打包。
 
-在 **Windows** 机器上：
+**方式 A：云端打包（无需 Windows）** —— 推送到 GitHub 仓库后，`.github/workflows/build.yml` 自动在云端 Windows 环境编译，产出两个 exe 到 Releases：
+
+- `bcut_subtitle.exe` —— **图形界面**（双击即用，无控制台窗口）
+- `bcut_subtitle_cli.exe` —— **命令行**（带控制台，适合拖拽/脚本批量）
+
+**方式 B：本地打包（在 Windows 机器上）**：
 
 1. 安装 Python 3.8+（勾选 "Add python.exe to PATH"）→ https://www.python.org/downloads/
-2. 把本项目文件夹（`bcut_subtitle.py` + `build.bat`）复制到 Windows
+2. 把本项目文件夹复制到 Windows
 3. **双击 `build.bat`**，自动安装 PyInstaller 并打包
-4. 完成后 exe 位于 `dist\bcut_subtitle.exe`
+4. 完成后两个 exe 位于 `dist\` 目录
 
 exe 用法：
 
-- **双击运行**：交互式输入文件路径（或把文件拖进窗口回车）
-- **拖拽到 exe 上**：直接把媒体文件拖到 `bcut_subtitle.exe` 图标，自动在同目录生成 `.srt`
-- **命令行**：`bcut_subtitle.exe 视频.mp4 -f json`
+- **双击 `bcut_subtitle.exe`**：打开图形界面
+- **拖拽到 `bcut_subtitle_cli.exe` 上**：把媒体文件拖到 CLI 版图标，自动在同目录生成 `.srt`
+- **命令行**：`bcut_subtitle_cli.exe 视频.mp4 -f json`
 
-如需识别**视频**文件，把 `ffmpeg.exe` 放到 exe 同目录即可（音频无需）。自定义图标：在 `build.bat` 里给打包命令加 `--icon app.ico`。
+如需识别**视频**文件，把 `ffmpeg.exe` 放到 exe 同目录即可（音频无需）。自定义图标：在 `build.bat` 里给 GUI 版打包命令加 `--icon app.ico`。
 
 ## 依赖
 
