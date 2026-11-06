@@ -28,8 +28,7 @@ if errorlevel 1 (
 
 echo.
 echo [3/4] 打包 GUI 版（无控制台，双击用）...
-rem 如需自定义图标，在下面一行加: --icon app.ico
-python -m PyInstaller --clean --noconfirm --onefile --windowed --name bcut_subtitle bcut_subtitle.py
+python -m PyInstaller --clean --noconfirm --onefile --windowed --icon app.ico --name bcut_subtitle bcut_subtitle.py
 if errorlevel 1 (
     echo [错误] GUI 版打包失败
     pause
@@ -38,7 +37,7 @@ if errorlevel 1 (
 
 echo.
 echo [4/4] 打包 CLI 版（带控制台，命令行用）...
-python -m PyInstaller --clean --noconfirm --onefile --name bcut_subtitle_cli bcut_subtitle.py
+python -m PyInstaller --clean --noconfirm --onefile --icon app.ico --name bcut_subtitle_cli bcut_subtitle.py
 if errorlevel 1 (
     echo [错误] CLI 版打包失败
     pause

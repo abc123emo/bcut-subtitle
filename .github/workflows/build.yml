@@ -24,10 +24,10 @@ jobs:
         run: python -m pip install --upgrade pyinstaller
 
       - name: Build GUI exe (无控制台)
-        run: python -m PyInstaller --clean --noconfirm --onefile --windowed --name bcut_subtitle bcut_subtitle.py
+        run: python -m PyInstaller --clean --noconfirm --onefile --windowed --icon app.ico --name bcut_subtitle bcut_subtitle.py
 
       - name: Build CLI exe (带控制台)
-        run: python -m PyInstaller --clean --noconfirm --onefile --name bcut_subtitle_cli bcut_subtitle.py
+        run: python -m PyInstaller --clean --noconfirm --onefile --icon app.ico --name bcut_subtitle_cli bcut_subtitle.py
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

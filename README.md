@@ -45,7 +45,7 @@ exe 用法：
 - **拖拽到 `bcut_subtitle_cli.exe` 上**：把媒体文件拖到 CLI 版图标，自动在同目录生成 `.srt`
 - **命令行**：`bcut_subtitle_cli.exe 视频.mp4 -f json`
 
-如需识别**视频**文件，把 `ffmpeg.exe` 放到 exe 同目录即可（音频无需）。自定义图标：在 `build.bat` 里给 GUI 版打包命令加 `--icon app.ico`。
+如需识别**视频**文件，把 `ffmpeg.exe` 放到 exe 同目录即可（音频无需）。图标：已内置 `app.ico`（蓝紫渐变 + 声波 + 字幕线条），打包时自动应用。
 
 ## 依赖
 
